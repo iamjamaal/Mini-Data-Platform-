@@ -1,0 +1,101 @@
+name: CD — Deploy to Test
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create .env file
+        run: cp .env.example .env
+
+      - name: Tear down any existing deployment
+        run: docker-compose down -v --remove-orphans || true
+
+      - name: Build all Docker images
+        run: docker-compose build --no-cache
+
+      - name: Deploy platform
+        run: docker-compose up -d
+
+      - name: Wait for all services to be healthy
+        run: |
+          echo "Waiting for services to become healthy..."
+          for i in $(seq 1 30); do
+            all_healthy=true
+            for service in postgres minio airflow metabase; do
+              status=$(docker inspect --format='{{.State.Health.Status}}' $service 2>/dev/null || echo "starting")
+              if [ "$status" != "healthy" ]; then
+                all_healthy=false
+              fi
+            done
+            if [ "$all_healthy" = "true" ]; then
+              echo "All services healthy at attempt $i"
+              break
+            fi
+            echo "Attempt $i/30 — services not ready yet, waiting 10s..."
+            sleep 10
+          done
+
+      - name: Verify all services are healthy
+        run: |
+          for service in postgres minio airflow metabase; do
+            status=$(docker inspect --format='{{.State.Health.Status}}' $service 2>/dev/null)
+            echo "$service: $status"
+            if [ "$status" != "healthy" ]; then
+              echo "::error::$service is not healthy after 5 minutes"
+              docker logs $service --tail 50
+              exit 1
+            fi
+          done
+
+      - name: Verify all endpoints respond
+        run: |
+          curl -sf http://localhost:8080/health  > /dev/null && echo "Airflow:    OK"
+          curl -sf http://localhost:3001/api/health > /dev/null && echo "Metabase:   OK"
+          curl -sf http://localhost:9000/minio/health/live > /dev/null && echo "MinIO:      OK"
+          docker exec postgres pg_isready -U dataplatform   && echo "PostgreSQL: OK"
+
+      - name: Verify MinIO data present
+        run: |
+          docker-compose run --rm minio-init sh -c "
+            mc alias set local http://minio:9000 minioadmin minioadmin123 &&
+            mc stat local/raw-data/sales_data.csv
+          "
+          echo "MinIO: sales_data.csv confirmed in raw-data bucket"
+
+      - name: Verify PostgreSQL schema
+        run: |
+          table_count=$(docker exec postgres psql -U dataplatform -d sales_warehouse -t -A -c \
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='sales';")
+          view_count=$(docker exec postgres psql -U dataplatform -d sales_warehouse -t -A -c \
+            "SELECT COUNT(*) FROM pg_views WHERE schemaname='sales';")
+          echo "PostgreSQL: $table_count table(s), $view_count views in sales schema"
+          if [ "$view_count" -lt 9 ]; then
+            echo "::error::Expected 9 views, found $view_count"
+            exit 1
+          fi
+
+      - name: Deployment summary
+        run: |
+          echo "================================================"
+          echo " CD DEPLOYMENT SUCCESSFUL"
+          echo "================================================"
+          echo " Airflow:    http://localhost:8080"
+          echo " MinIO:      http://localhost:9001"
+          echo " Metabase:   http://localhost:3001"
+          echo " PostgreSQL: localhost:5432"
+          echo "================================================"
+
+      - name: Tear down
+        if: always()
+        run: docker-compose down -v
