@@ -75,7 +75,7 @@ jobs:
 
       - name: "Step 4/4 — Visualization: Verify Metabase health"
         run: |
-          response=$(curl -s http://localhost:3000/api/health)
+          response=$(curl -s http://localhost:3001/api/health)
           echo "Metabase health response: $response"
           if echo "$response" | grep -q '"status":"ok"'; then
             echo "VISUALIZATION: Metabase connected and healthy"
