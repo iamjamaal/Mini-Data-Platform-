@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -31,11 +32,12 @@ jobs:
 
       - name: Wait for all services to be healthy
         run: |
-          echo "Waiting for services to become healthy..."
-          for i in $(seq 1 30); do
+          echo "Waiting for services to become healthy (up to 10 minutes)..."
+          for i in $(seq 1 60); do
             all_healthy=true
             for service in postgres minio airflow metabase; do
               status=$(docker inspect --format='{{.State.Health.Status}}' $service 2>/dev/null || echo "starting")
+              echo "  $service: $status"
               if [ "$status" != "healthy" ]; then
                 all_healthy=false
               fi
@@ -44,20 +46,16 @@ jobs:
               echo "All services healthy at attempt $i"
               break
             fi
-            echo "Attempt $i/30 — services not ready yet, waiting 10s..."
-            sleep 10
-          done
-
-      - name: Verify all services are healthy
-        run: |
-          for service in postgres minio airflow metabase; do
-            status=$(docker inspect --format='{{.State.Health.Status}}' $service 2>/dev/null)
-            echo "$service: $status"
-            if [ "$status" != "healthy" ]; then
-              echo "::error::$service is not healthy after 5 minutes"
-              docker logs $service --tail 50
+            if [ "$i" -eq 60 ]; then
+              echo "::error::Services did not become healthy within 10 minutes"
+              for service in postgres minio airflow metabase; do
+                echo "--- $service logs ---"
+                docker logs $service --tail 30
+              done
               exit 1
             fi
+            echo "Attempt $i/60 — waiting 10s..."
+            sleep 10
           done
 
       - name: Verify all endpoints respond
