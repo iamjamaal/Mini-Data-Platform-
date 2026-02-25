@@ -1,0 +1,100 @@
+name: Data Flow Validation
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  validate-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start platform
+        run: |
+          cp .env.example .env
+          docker-compose up -d
+          sleep 60
+
+      - name: "Step 1/4 — Ingestion: Verify sales_data.csv in MinIO"
+        run: |
+          docker-compose run --rm minio-init sh -c "
+            mc alias set local http://minio:9000 minioadmin minioadmin123 &&
+            mc stat local/raw-data/sales_data.csv
+          "
+          echo "sales_data.csv present in MinIO (raw-data bucket)"
+
+      - name: "Step 2/4 — Processing: Trigger Airflow DAG and wait"
+        run: |
+          docker exec airflow airflow dags trigger sales_etl_pipeline
+          echo "DAG triggered — waiting for completion..."
+          for i in $(seq 1 60); do
+            state=$(docker exec airflow airflow dags list-runs \
+              -d sales_etl_pipeline -o plain --no-header 2>/dev/null \
+              | head -1 | awk '{print $3}')
+            echo "  Attempt $i/60 — state: ${state:-pending}"
+            if [ "$state" = "success" ]; then
+              echo "PROCESSING: Airflow DAG completed successfully"
+              break
+            elif [ "$state" = "failed" ]; then
+              echo "PROCESSING: DAG failed — dumping task logs:"
+              for task in extract_from_minio transform_data load_to_postgres validate_load; do
+                echo "--- $task ---"
+                docker exec airflow airflow tasks logs sales_etl_pipeline $task -1 2>/dev/null | tail -20
+              done
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: "Step 3/4 — Storage: Verify data in PostgreSQL"
+        run: |
+          result=$(docker exec postgres psql -U dataplatform -d sales_warehouse -t -A -c "
+            SELECT json_build_object(
+              'total_rows', (SELECT COUNT(*) FROM sales.raw_orders),
+              'unique_orders', (SELECT COUNT(DISTINCT order_id) FROM sales.raw_orders),
+              'unique_customers', (SELECT COUNT(DISTINCT customer_id) FROM sales.raw_orders),
+              'total_revenue', (SELECT ROUND(SUM(sales)::numeric, 2) FROM sales.raw_orders),
+              'total_profit', (SELECT ROUND(SUM(profit)::numeric, 2) FROM sales.raw_orders),
+              'date_range', (SELECT MIN(order_date) || ' to ' || MAX(order_date) FROM sales.raw_orders)
+            );
+          ")
+          echo "PostgreSQL validation result:"
+          echo "$result" | python3 -m json.tool
+
+          # Assert minimum row count (should be ~248K+ after cleaning)
+          row_count=$(echo "$result" | python3 -c "import sys,json; print(json.load(sys.stdin)['total_rows'])")
+          if [ "$row_count" -lt 200000 ]; then
+            echo "STORAGE: Only $row_count rows — expected 200,000+"
+            exit 1
+          fi
+          echo "STORAGE: $row_count rows loaded into PostgreSQL"
+
+      - name: "Step 4/4 — Visualization: Verify Metabase health"
+        run: |
+          response=$(curl -s http://localhost:3000/api/health)
+          echo "Metabase health response: $response"
+          if echo "$response" | grep -q '"status":"ok"'; then
+            echo "VISUALIZATION: Metabase connected and healthy"
+          else
+            echo "VISUALIZATION: Metabase not responding"
+            exit 1
+          fi
+
+      - name: "Pipeline validation summary"
+        run: |
+          echo """
+          echo  DATA FLOW VALIDATION — ALL CHECKS PASSED  
+          echo
+          echo  1. MinIO (Ingestion)      sales_data.csv 
+          echo  2. Airflow (Processing)    ETL DAG success   
+          echo  3. PostgreSQL (Storage)    200K+ rows loaded 
+          echo  4. Metabase (Viz)         Connected & OK   
+          echo """
+
+      - name: Tear down
+        if: always()
+        run: docker-compose down -v
