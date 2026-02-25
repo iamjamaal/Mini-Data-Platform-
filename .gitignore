@@ -1,0 +1,20 @@
+# Docker volumes 
+minio/data/
+metabase/data/
+airflow/logs/
+postgres/data/
+
+
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+
+# OS 
+.DS_Store
+Thumbs.db
