@@ -12,16 +12,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Start platform
         run: |
           cp .env.example .env
-          docker-compose up -d
+          docker compose up -d
           sleep 60
 
       - name: "Step 1/4 — Ingestion: Verify sales_data.csv in MinIO"
         run: |
-          docker-compose run --rm minio-init sh -c "
+          docker compose run --rm minio-init sh -c "
             mc alias set local http://minio:9000 minioadmin minioadmin123 &&
             mc stat local/raw-data/sales_data.csv
           "
@@ -97,4 +99,4 @@ jobs:
 
       - name: Tear down
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v
