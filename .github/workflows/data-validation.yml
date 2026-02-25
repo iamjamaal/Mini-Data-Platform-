@@ -19,7 +19,22 @@ jobs:
         run: |
           cp .env.example .env
           docker compose up -d
-          sleep 60
+          echo "Waiting for all services to be healthy..."
+          for i in $(seq 1 30); do
+            all_healthy=true
+            for service in postgres minio airflow metabase; do
+              status=$(docker inspect --format='{{.State.Health.Status}}' $service 2>/dev/null || echo "starting")
+              if [ "$status" != "healthy" ]; then
+                all_healthy=false
+              fi
+            done
+            if [ "$all_healthy" = "true" ]; then
+              echo "All services healthy at attempt $i"
+              break
+            fi
+            echo "Attempt $i/30 — waiting 10s..."
+            sleep 10
+          done
 
       - name: "Step 1/4 — Ingestion: Verify sales_data.csv in MinIO"
         run: |
@@ -31,6 +46,16 @@ jobs:
 
       - name: "Step 2/4 — Processing: Trigger Airflow DAG and wait"
         run: |
+          echo "Waiting for DAG to be parsed by scheduler..."
+          for i in $(seq 1 12); do
+            if docker exec airflow airflow dags list 2>/dev/null | grep -q sales_etl_pipeline; then
+              echo "DAG found at attempt $i"
+              break
+            fi
+            echo "Attempt $i/12 — DAG not yet available, waiting 10s..."
+            sleep 10
+          done
+          docker exec airflow airflow dags unpause sales_etl_pipeline
           docker exec airflow airflow dags trigger sales_etl_pipeline
           echo "DAG triggered — waiting for completion..."
           for i in $(seq 1 60); do
@@ -51,6 +76,10 @@ jobs:
             fi
             sleep 10
           done
+          if [ "$state" != "success" ]; then
+            echo "::error::DAG did not complete within 10 minutes (last state: ${state:-unknown})"
+            exit 1
+          fi
 
       - name: "Step 3/4 — Storage: Verify data in PostgreSQL"
         run: |
