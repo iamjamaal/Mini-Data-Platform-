@@ -1,0 +1,74 @@
+name: CI — Build & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+    
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create .env file
+        run: cp .env.example .env
+
+      - name: Build all Docker images
+        run: docker-compose build
+
+      - name: Start services
+        run: |
+          docker-compose up -d
+          echo "Waiting for services to be healthy..."
+          sleep 30
+
+      - name: Check service health
+        run: |
+          for service in postgres minio airflow metabase; do
+            status=$(docker inspect --format='{{.State.Health.Status}}' $service 2>/dev/null || echo "no-healthcheck")
+            echo "$service: $status"
+            if [ "$status" = "unhealthy" ]; then
+              echo "::error::$service is unhealthy"
+              docker logs $service --tail 50
+              exit 1
+            fi
+          done
+
+      - name: Verify MinIO has sales_data.csv
+        run: |
+          docker-compose run --rm minio-init sh -c "
+            mc alias set local http://minio:9000 minioadmin minioadmin123 &&
+            mc stat local/raw-data/sales_data.csv
+          "
+
+      - name: Verify PostgreSQL schema
+        run: |
+          docker exec postgres psql -U dataplatform -d sales_warehouse -c "
+            SELECT table_name FROM information_schema.tables WHERE table_schema='sales';
+          "
+          docker exec postgres psql -U dataplatform -d sales_warehouse -c "
+            SELECT viewname FROM pg_views WHERE schemaname='sales';
+          "
+
+      - name: Run Airflow DAG syntax check
+        run: |
+          docker exec airflow airflow dags list | grep sales_etl_pipeline
+          docker exec airflow python -c "
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('dag', '/opt/airflow/dags/sales_pipeline.py')
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            print('DAG syntax OK — sales_etl_pipeline')
+          "
+
+      - name: Tear down
+        if: always()
+        run: docker-compose down -v
