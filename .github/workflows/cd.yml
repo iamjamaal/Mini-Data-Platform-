@@ -21,6 +21,9 @@ jobs:
       - name: Create .env file
         run: cp .env.example .env
 
+      - name: Create Airflow logs directory with correct permissions
+        run: mkdir -p airflow/logs && chmod 777 airflow/logs
+
       - name: Tear down any existing deployment
         run: docker compose down -v --remove-orphans || true
 
