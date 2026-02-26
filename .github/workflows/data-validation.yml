@@ -57,12 +57,22 @@ jobs:
             sleep 10
           done
           docker exec airflow airflow dags unpause sales_etl_pipeline
-          docker exec airflow airflow dags trigger sales_etl_pipeline
-          echo "DAG triggered — waiting for completion..."
+          trigger_output=$(docker exec airflow airflow dags trigger sales_etl_pipeline 2>&1)
+          echo "Trigger output: $trigger_output"
+          run_id=$(echo "$trigger_output" | grep -o 'manual__[^ ,>]*' | head -1)
+          echo "Tracking run_id: ${run_id:-<not captured, will use latest manual run>}"
+          echo "DAG triggered — waiting for completion (up to 10 minutes)..."
+          state=""
           for i in $(seq 1 60); do
-            state=$(docker exec airflow airflow dags list-runs \
-              -d sales_etl_pipeline -o plain --no-header 2>/dev/null \
-              | head -1 | awk '{print $3}')
+            if [ -n "$run_id" ]; then
+              state=$(docker exec airflow airflow dags list-runs \
+                -d sales_etl_pipeline -o plain --no-header 2>/dev/null \
+                | grep "$run_id" | awk '{print $3}')
+            else
+              state=$(docker exec airflow airflow dags list-runs \
+                -d sales_etl_pipeline -o plain --no-header 2>/dev/null \
+                | grep "manual__" | tail -1 | awk '{print $3}')
+            fi
             echo "  Attempt $i/60 — state: ${state:-pending}"
             if [ "$state" = "success" ]; then
               echo "PROCESSING: Airflow DAG completed successfully"
@@ -118,14 +128,14 @@ jobs:
 
       - name: "Pipeline validation summary"
         run: |
-          echo """
-          echo  DATA FLOW VALIDATION — ALL CHECKS PASSED  
-          echo
-          echo  1. MinIO (Ingestion)      sales_data.csv 
-          echo  2. Airflow (Processing)    ETL DAG success   
-          echo  3. PostgreSQL (Storage)    200K+ rows loaded 
-          echo  4. Metabase (Viz)         Connected & OK   
-          echo """
+          echo "================================================"
+          echo "  DATA FLOW VALIDATION — ALL CHECKS PASSED"
+          echo "================================================"
+          echo "  1. MinIO (Ingestion)     sales_data.csv present"
+          echo "  2. Airflow (Processing)  ETL DAG success"
+          echo "  3. PostgreSQL (Storage)  200K+ rows loaded"
+          echo "  4. Metabase (Viz)        Connected and healthy"
+          echo "================================================"
 
       - name: Tear down
         if: always()
