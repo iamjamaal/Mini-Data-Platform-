@@ -59,26 +59,6 @@ The sample dataset is a retail superstore sales dataset spanning **January 2023 
 ![Architecture Diagram](docs/architecture_diagram.png)
 
 ```
-                        MINI DATA PLATFORM — DATA FLOW
-  ─────────────────────────────────────────────────────────────────────────
-
-  ┌──────────────┐   CSV file   ┌──────────────┐  cleaned rows  ┌──────────────┐
-  │              │─────────────▶│              │───────────────▶│              │
-  │    MinIO     │              │   Airflow    │                │  PostgreSQL  │
-  │  Data Lake   │              │  ETL Pipeline│                │    Data      │
-  │              │◀─────────────│              │                │  Warehouse   │
-  │  port 9001   │  download    │  port 8080   │                │  port 5432   │
-  └──────────────┘              └──────────────┘                └──────────────┘
-                                                                       │
-                                                                       │ SQL queries
-                                                                       ▼
-                                                               ┌──────────────┐
-                                                               │              │
-                                                               │   Metabase   │
-                                                               │  Dashboards  │
-                                                               │              │
-                                                               │  port 3001   │
-                                                               └──────────────┘
 
   ─────────────────────────────────────────────────────────────────────────
   PIPELINE TASKS (Airflow DAG: sales_etl_pipeline, runs @daily)
