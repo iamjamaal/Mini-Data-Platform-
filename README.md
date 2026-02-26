@@ -185,7 +185,7 @@ The `sales_etl_pipeline` DAG runs on a `@daily` schedule. To run it immediately:
 ```bash
 # Option A — via Airflow web UI
 # Go to http://localhost:8080, log in, click the toggle to unpause the DAG,
-# then click the play button (▶) to trigger a manual run.
+# then click the play button to trigger a manual run.
 
 # Option B — via CLI
 docker exec airflow airflow dags unpause sales_etl_pipeline
