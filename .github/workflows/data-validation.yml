@@ -57,22 +57,22 @@ jobs:
             sleep 10
           done
           docker exec airflow airflow dags unpause sales_etl_pipeline
-          trigger_output=$(docker exec airflow airflow dags trigger sales_etl_pipeline 2>&1)
-          echo "Trigger output: $trigger_output"
-          run_id=$(echo "$trigger_output" | grep -o 'manual__[^ ,>]*' | head -1)
-          echo "Tracking run_id: ${run_id:-<not captured, will use latest manual run>}"
+          docker exec airflow airflow dags trigger sales_etl_pipeline
           echo "DAG triggered — waiting for completion (up to 10 minutes)..."
           state=""
           for i in $(seq 1 60); do
-            if [ -n "$run_id" ]; then
-              state=$(docker exec airflow airflow dags list-runs \
-                -d sales_etl_pipeline -o plain --no-header 2>/dev/null \
-                | grep "$run_id" | awk '{print $3}')
-            else
-              state=$(docker exec airflow airflow dags list-runs \
-                -d sales_etl_pipeline -o plain --no-header 2>/dev/null \
-                | grep "manual__" | tail -1 | awk '{print $3}')
-            fi
+            state=$(docker exec airflow airflow dags list-runs \
+              -d sales_etl_pipeline -o json 2>/dev/null \
+              | python3 -c "
+import sys, json
+try:
+    runs = json.load(sys.stdin)
+    manual = [r for r in runs if r.get('dag_run_id','').startswith('manual__')]
+    latest = sorted(manual, key=lambda r: r.get('execution_date',''))[-1] if manual else None
+    print(latest['state'] if latest else '')
+except Exception:
+    print('')
+" 2>/dev/null)
             echo "  Attempt $i/60 — state: ${state:-pending}"
             if [ "$state" = "success" ]; then
               echo "PROCESSING: Airflow DAG completed successfully"
