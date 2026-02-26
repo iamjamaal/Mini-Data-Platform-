@@ -56,6 +56,8 @@ The sample dataset is a retail superstore sales dataset spanning **January 2023 
 
 ## Architecture & Data Flow
 
+![Architecture Diagram](docs/architecture_diagram.png)
+
 ```
                         MINI DATA PLATFORM — DATA FLOW
   ─────────────────────────────────────────────────────────────────────────
