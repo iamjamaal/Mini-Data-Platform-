@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(cd \"C:/Users/NoahJamalNabila/Desktop/Mini-Data-Platform-\" && gh run list --limit 10 2>&1)",
-      "Bash(where gh:*)"
-    ]
-  }
-}
