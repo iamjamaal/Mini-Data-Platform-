@@ -63,16 +63,8 @@ jobs:
           for i in $(seq 1 60); do
             state=$(docker exec airflow airflow dags list-runs \
               -d sales_etl_pipeline -o json 2>/dev/null \
-              | python3 -c "
-import sys, json
-try:
-    runs = json.load(sys.stdin)
-    manual = [r for r in runs if r.get('dag_run_id','').startswith('manual__')]
-    latest = sorted(manual, key=lambda r: r.get('execution_date',''))[-1] if manual else None
-    print(latest['state'] if latest else '')
-except Exception:
-    print('')
-" 2>/dev/null)
+              | python3 -c 'import sys,json; d=json.load(sys.stdin); m=sorted([r for r in d if r.get("dag_run_id","").startswith("manual__")],key=lambda r:r.get("execution_date","")); print(m[-1]["state"] if m else "")' \
+              2>/dev/null)
             echo "  Attempt $i/60 — state: ${state:-pending}"
             if [ "$state" = "success" ]; then
               echo "PROCESSING: Airflow DAG completed successfully"
