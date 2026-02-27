@@ -33,12 +33,14 @@ CREATE TABLE IF NOT EXISTS sales.raw_orders (
     loaded_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
 -- Index for common query patterns
 CREATE INDEX IF NOT EXISTS idx_orders_date ON sales.raw_orders(order_date);
 CREATE INDEX IF NOT EXISTS idx_orders_region ON sales.raw_orders(region);
 CREATE INDEX IF NOT EXISTS idx_orders_category ON sales.raw_orders(category);
 CREATE INDEX IF NOT EXISTS idx_orders_customer ON sales.raw_orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_order_id ON sales.raw_orders(order_id);
+
 
 
 
