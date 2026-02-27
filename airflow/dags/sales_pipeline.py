@@ -3,7 +3,6 @@ Sales Data Pipeline DAG
 Extracts sales_data.csv from MinIO → Cleans with Pandas → Loads into PostgreSQL.
 
 
-
 Data quality handling:
   - Strips whitespace from customer names
   - Fills missing postal codes with NULL
@@ -46,7 +45,7 @@ dag = DAG(
 
 
 
-# ─── TASK 1: EXTRACT FROM MINIO
+# TASK 1: EXTRACT FROM MINIO
 
 def extract_from_minio(**context):
     """Download sales_data.csv from MinIO bucket."""
@@ -77,7 +76,7 @@ def extract_from_minio(**context):
 
 
 
-# ─── TASK 2: TRANSFORM & CLEAN
+# TASK 2: TRANSFORM & CLEAN
 
 def transform_data(**context):
     """
@@ -115,7 +114,7 @@ def transform_data(**context):
         "Product Name": str,
         "Sales": float,
         "Quantity": int,
-        "Discount": str,  # Read as string — some are blank
+        "Discount": str,  # Read as string (some are blank)
         "Profit": float,
     })
 
@@ -124,7 +123,10 @@ def transform_data(**context):
     initial_count = len(df)
     logger.info(f"Loaded {initial_count} rows from CSV")
 
-    # ── Cleaning ──
+
+
+
+    #Cleaning 
 
     # 1. Strip whitespace from customer names
     df["Customer Name"] = df["Customer Name"].str.strip()
@@ -168,7 +170,7 @@ def transform_data(**context):
 
 
 
-# ─── TASK 3: LOAD TO POSTGRESQL 
+# TASK 3: LOAD TO POSTGRESQL 
 
 def load_to_postgres(**context):
     """
@@ -226,7 +228,7 @@ def load_to_postgres(**context):
 
 
 
-    # Batch processing — 5,000 rows per batch for 250K dataset
+    # Batch processing 5,000 rows per batch for 250K+ dataset
     BATCH_SIZE = 5000
     total_loaded = 0
 
@@ -260,7 +262,7 @@ def load_to_postgres(**context):
     
 
 
-# ─── TASK 4: VALIDATE
+# TASK 4: VALIDATE
 
 def validate_load(**context):
     """
@@ -323,7 +325,7 @@ def validate_load(**context):
     
 
 
-# ─── DAG WIRING 
+# DAG WIRING 
 
 extract = PythonOperator(
     task_id="extract_from_minio",

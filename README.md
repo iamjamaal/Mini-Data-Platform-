@@ -63,7 +63,7 @@ The sample dataset is a retail superstore sales dataset spanning **January 2023 
   ─────────────────────────────────────────────────────────────────────────
   PIPELINE TASKS (Airflow DAG: sales_etl_pipeline, runs @daily)
 
-    extract_from_minio  ──▶  transform_data  ──▶  load_to_postgres  ──▶  validate_load
+    extract_from_minio  ── transform_data  ──  load_to_postgres  ── validate_load
 
     1. Extract:   Download sales_data.csv from MinIO raw-data bucket
     2. Transform: Clean with Pandas — parse dates, strip whitespace,

@@ -19,6 +19,7 @@ airflow users create \
   --role Admin \
   --email admin@example.com 2>/dev/null || echo "    Admin user already exists, skipping."
 
+
 echo ">>> Starting Airflow scheduler in background..."
 airflow scheduler &
 

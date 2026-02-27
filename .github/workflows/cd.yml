@@ -1,5 +1,6 @@
 name: CD — Deploy to Test
 
+
 on:
   push:
     branches: [main]
@@ -61,6 +62,7 @@ jobs:
             sleep 10
           done
 
+
       - name: Verify all endpoints respond
         run: |
           curl -sf http://localhost:8080/health  > /dev/null && echo "Airflow:    OK"
@@ -76,6 +78,7 @@ jobs:
           "
           echo "MinIO: sales_data.csv confirmed in raw-data bucket"
 
+
       - name: Verify PostgreSQL schema
         run: |
           table_count=$(docker exec postgres psql -U dataplatform -d sales_warehouse -t -A -c \
@@ -88,16 +91,14 @@ jobs:
             exit 1
           fi
 
+
       - name: Deployment summary
         run: |
-          echo "================================================"
           echo " CD DEPLOYMENT SUCCESSFUL"
-          echo "================================================"
           echo " Airflow:    http://localhost:8080"
           echo " MinIO:      http://localhost:9001"
           echo " Metabase:   http://localhost:3001"
           echo " PostgreSQL: localhost:5432"
-          echo "================================================"
 
       - name: Tear down
         if: always()

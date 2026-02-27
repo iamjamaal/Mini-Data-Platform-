@@ -8,7 +8,7 @@ x-common-env: &common-env
 
 
 services:
-  # ─── DATA STORAGE
+# DATA STORAGE
   postgres:
     image: postgres:15
     container_name: postgres
@@ -29,7 +29,7 @@ services:
 
 
 
-  # ─── OBJECT STORAGE (DATA LAKE) 
+  # OBJECT STORAGE (DATA LAKE) 
   minio:
     image: minio/minio:latest
     container_name: minio
@@ -52,7 +52,7 @@ services:
 
 
 
-  # ─── MinIO BUCKET INIT + DATA UPLOAD 
+  # MinIO BUCKET INIT + DATA UPLOAD 
   minio-init:
     image: minio/mc:latest
     container_name: minio-init
@@ -73,7 +73,7 @@ services:
 
 
 
-  # ─── WORKFLOW ORCHESTRATION 
+  # WORKFLOW ORCHESTRATION 
   airflow:
     build:
       context: ./airflow
@@ -115,7 +115,7 @@ services:
 
 
 
-  # ─── NOTEBOOKS
+  # NOTEBOOKS
   jupyter:
     image: jupyter/scipy-notebook:latest
     container_name: jupyter
@@ -146,7 +146,7 @@ services:
 
 
 
-  # ─── VISUALIZATION / BI
+  # VISUALIZATION / BI
   metabase:
     image: metabase/metabase:latest
     container_name: metabase
