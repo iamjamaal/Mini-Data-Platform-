@@ -126,11 +126,6 @@ ls -lh minio/sample-data/sales_data.csv
 # Expected: ~55 MB file, NOT a text pointer
 ```
 
-### 2. Configure environment variables
-
-```bash
-cp .env.example .env
-```
 
 The defaults in `.env.example` work out of the box for local development. See [Environment Variables](#environment-variables) for details.
 
