@@ -28,7 +28,7 @@ A fully containerised, end-to-end sales data platform built with Docker Compose.
 
 ## Overview
 
-This project implements a **mini data platform** for analysing retail sales data. It was built as a CI/CD module lab (AmaliTech DEM012) to demonstrate how the four core components of a modern data stack — ingestion, orchestration, storage, and visualisation — fit together and can be automated end-to-end.
+This project implements a **mini data platform** for analysing retail sales data. It was built as a CI/CD module lab to demonstrate how the four core components of a modern data stack — ingestion, orchestration, storage, and visualisation — fit together and can be automated end-to-end.
 
 ### What the platform does
 
